@@ -3,9 +3,28 @@ import os
 import joblib
 import math
 import numpy as np
+from abc import ABC, abstractmethod
 from collections import defaultdict, Counter
 
-class TFIDFEmbedding:
+class BaseEmbedding(ABC):
+    @abstractmethod
+    def embed(self, text) -> np.ndarray:
+        pass
+
+    @abstractmethod
+    def embed_corpus(self) -> np.ndarray:
+        pass
+
+    @abstractmethod
+    def query(self, text: str, sentence_set: list, k: int) -> list:
+        pass
+
+    @abstractmethod
+    def export(self, path: str):
+        pass
+
+
+class TFIDFEmbedding(BaseEmbedding):
     def __init__(self, corpus_or_path):
         if isinstance(corpus_or_path, str) and os.path.exists(corpus_or_path):
             data = joblib.load(corpus_or_path)
@@ -75,3 +94,67 @@ class TFIDFEmbedding:
 
     def export(self, path):
         joblib.dump({'corpus': self.corpus, 'vocab': self.vocab, 'idf': self.idf}, path)
+
+
+class CharNgramEmbedding(BaseEmbedding):
+    def __init__(self, corpus_or_path, n=3):
+        self.n = n
+        if isinstance(corpus_or_path, str) and os.path.exists(corpus_or_path):
+            self._load(corpus_or_path)
+        elif isinstance(corpus_or_path, list):
+            self.corpus = [self._normalize(s) for s in corpus_or_path]
+            self.vocab = self._build_vocab(self.corpus)
+            self.vocab_index = {ng: i for i, ng in enumerate(self.vocab)}
+        else:
+            raise ValueError("Input must be a list of strings or a valid path.")
+
+    def _normalize(self, text):
+        text = unicodedata.normalize('NFKC', text)
+        return ''.join(c for c in text.lower() if c.isalnum())
+
+    def _char_ngrams(self, text):
+        return [text[i:i+self.n] for i in range(len(text)-self.n+1)]
+
+    def _build_vocab(self, corpus):
+        vocab = set()
+        for text in corpus:
+            vocab.update(self._char_ngrams(text))
+        return sorted(vocab)
+
+    def embed(self, text) -> np.ndarray:
+        text = self._normalize(text)
+        ngrams = self._char_ngrams(text)
+        vec = np.zeros(len(self.vocab), dtype=np.float32)
+        for ng in ngrams:
+            if ng in self.vocab_index:
+                vec[self.vocab_index[ng]] += 1
+        if vec.sum() > 0:
+            vec = vec / vec.sum()
+        return vec
+
+    def embed_corpus(self) -> np.ndarray:
+        return np.stack([self.embed(t) for t in self.corpus])
+
+    def query(self, text: str, sentence_set: list, k: int) -> list:
+        sentences = [self._normalize(s) for s in sentence_set]
+        matrix = np.stack([self.embed(s) for s in sentences])
+        query_vec = self.embed(text)
+        sims = matrix @ query_vec
+        exp_sim = np.exp(sims - np.max(sims))
+        probs = exp_sim / exp_sim.sum()
+        topk = np.argsort(probs)[-k:][::-1]
+        return [sentence_set[i] for i in topk]
+
+    def export(self, path):
+        joblib.dump({
+            'n': self.n,
+            'corpus': self.corpus,
+            'vocab': self.vocab
+        }, path)
+
+    def _load(self, path):
+        data = joblib.load(path)
+        self.n = data['n']
+        self.corpus = data['corpus']
+        self.vocab = data['vocab']
+        self.vocab_index = {ng: i for i, ng in enumerate(self.vocab)}
