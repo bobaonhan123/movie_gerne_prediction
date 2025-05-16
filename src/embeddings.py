@@ -5,6 +5,7 @@ import math
 import numpy as np
 from abc import ABC, abstractmethod
 from collections import defaultdict, Counter
+import re
 
 class BaseEmbedding(ABC):
     @abstractmethod
@@ -102,15 +103,18 @@ class CharNgramEmbedding(BaseEmbedding):
         if isinstance(corpus_or_path, str) and os.path.exists(corpus_or_path):
             self._load(corpus_or_path)
         elif isinstance(corpus_or_path, list):
+            self.raw_corpus = corpus_or_path  # 🔹 Lưu bản gốc
             self.corpus = [self._normalize(s) for s in corpus_or_path]
             self.vocab = self._build_vocab(self.corpus)
             self.vocab_index = {ng: i for i, ng in enumerate(self.vocab)}
+            self.corpus_embeddings = np.stack([self.embed(s) for s in self.corpus])
         else:
             raise ValueError("Input must be a list of strings or a valid path.")
 
     def _normalize(self, text):
-        text = unicodedata.normalize('NFKC', text)
-        return ''.join(c for c in text.lower() if c.isalnum())
+        text = str(text).strip()
+        text = re.sub(r'\s+', ' ', text) 
+        return text
 
     def _char_ngrams(self, text):
         return [text[i:i+self.n] for i in range(len(text)-self.n+1)]
@@ -133,7 +137,7 @@ class CharNgramEmbedding(BaseEmbedding):
         return vec
 
     def embed_corpus(self) -> np.ndarray:
-        return np.stack([self.embed(t) for t in self.corpus])
+        return self.corpus_embeddings
 
     def query(self, text: str, sentence_set: list, k: int) -> list:
         sentences = [self._normalize(s) for s in sentence_set]
@@ -145,16 +149,29 @@ class CharNgramEmbedding(BaseEmbedding):
         topk = np.argsort(probs)[-k:][::-1]
         return [sentence_set[i] for i in topk]
 
+    def query_in_initial_set(self, text: str, k: int = 5) -> list:
+        query_vec = self.embed(text)
+        sims = self.corpus_embeddings @ query_vec
+        exp_sim = np.exp(sims - np.max(sims))
+        probs = exp_sim / exp_sim.sum()
+        topk = np.argsort(probs)[-k:][::-1]
+        return [self.raw_corpus[i] for i in topk]
+
     def export(self, path):
         joblib.dump({
             'n': self.n,
+            'raw_corpus': self.raw_corpus,  # 🔹 Thêm vào
             'corpus': self.corpus,
-            'vocab': self.vocab
+            'vocab': self.vocab,
+            'corpus_embeddings': self.corpus_embeddings
         }, path)
 
     def _load(self, path):
         data = joblib.load(path)
         self.n = data['n']
+        self.raw_corpus = data['raw_corpus']  # 🔹 Lấy lại
         self.corpus = data['corpus']
         self.vocab = data['vocab']
         self.vocab_index = {ng: i for i, ng in enumerate(self.vocab)}
+        self.corpus_embeddings = data['corpus_embeddings']
+
