@@ -151,7 +151,11 @@ class CharNgramEmbedding(BaseEmbedding):
 
     def query_in_initial_set(self, text: str, k: int = 5) -> list:
         query_vec = self.embed(text)
-        sims = self.corpus_embeddings @ query_vec
+        sims = self.corpus_embeddings @ query_vec 
+        """
+        Query vec is a vector of shape (d, )
+        Corpus embeddings is a matrix of shape (n, d)
+        """
         exp_sim = np.exp(sims - np.max(sims))
         probs = exp_sim / exp_sim.sum()
         topk = np.argsort(probs)[-k:][::-1]
@@ -160,7 +164,7 @@ class CharNgramEmbedding(BaseEmbedding):
     def export(self, path):
         joblib.dump({
             'n': self.n,
-            'raw_corpus': self.raw_corpus,  # 🔹 Thêm vào
+            'raw_corpus': self.raw_corpus, 
             'corpus': self.corpus,
             'vocab': self.vocab,
             'corpus_embeddings': self.corpus_embeddings

@@ -1,3 +1,14 @@
+import unicodedata
+
+class UnicodeEncoder:
+    @classmethod
+    def convert_from_unicode(cls, s: str) -> str:
+        normalized = unicodedata.normalize('NFD', s)
+        return ''.join(
+            c for c in normalized
+            if not unicodedata.combining(c)
+        )
+
 class StringComparison:
     def __init__(self, a: str, b: str):
         self.a = a
