@@ -113,7 +113,7 @@ class CharNgramEmbedding(BaseEmbedding):
 
     def _normalize(self, text):
         text = str(text).strip()
-        text = re.sub(r'\s+', ' ', text) 
+        text = re.sub(r'\s+', ' ', text)
         return text
 
     def _char_ngrams(self, text):
