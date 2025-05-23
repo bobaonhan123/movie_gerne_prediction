@@ -44,3 +44,4 @@ This project is licensed under the MIT License. See the [LICENSE](./LICENSE) fil
 ## References
 - [1] [Danh sách tên các con đường tại thành phố Đà Nẵng" - Congdulieu.vn](https://congdulieu.vn/dulieuchitiet/1037328#)
 - [2] Đơn vị hành chính. (n.d.). [https://danhmuchanhchinh.gso.gov.vn/](https://danhmuchanhchinh.gso.gov.vn/)
+- [3] Vu, T. (2017, May 24). Bài 24: Neighborhood-Based Collaborative Filtering. Tiep Vu’s Blog. https://machinelearningcoban.com/2017/05/24/collaborativefiltering/
